@@ -1,0 +1,90 @@
+import requests
+from bs4 import BeautifulSoup
+import tkinter as tk  # Using Tkinter for GUI
+
+# Replace with target website URLs (avoid excessive scraping)
+TARGET_URLS = [
+    "https://www.amazon.com/s?k=your_product_search",
+    "https://www.ebay.com/sch/i.html?_nkw=your_product_search",
+    # Add more URLs if needed
+]
+
+# Function to scrape product information from a single website
+def scrape_website(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for non-200 status codes
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Extract product information using website-specific selectors (replace as needed)
+        products = []
+        for product_element in soup.find_all("div", class_="product-item"):
+            title = product_element.find("a", class_="product-title").text.strip()
+            price_element = product_element.find("span", class_="price")
+            price = price_element.text.strip() if price_element else "Not available"
+            reviews = product_element.find("span", class_="review-count").text.strip() if product_element.find("span", class_="review-count") else "No reviews"
+            product_url = product_element.find("a", class_="product-link")["href"]
+
+            products.append({
+                "title": title,
+                "price": price,
+                "reviews": reviews,
+                "url": product_url
+            })
+
+        return products
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error scraping {url}: {e}")
+        return []  # Return empty list if scraping fails
+
+# Function to display product information in the GUI
+def display_products(products):
+    # Clear previous product list
+    product_list.delete(0, tk.END)
+
+    # Update product list with scraped data
+    for product in products:
+        product_list.insert(tk.END, f"{product['title']} - ${product['price']} ({product['reviews']})")
+        product_list.see(tk.END)  # Scroll to the end of the list
+
+# Function to handle user input and trigger scraping
+def search_products():
+    search_term = search_entry.get()
+    if not search_term:
+        return
+
+    scraped_products = []
+    for url in TARGET_URLS:
+        updated_url = url.replace("your_product_search", search_term)
+        scraped_products.extend(scrape_website(updated_url))
+
+    # Sort products by price (optional)
+    scraped_products.sort(key=lambda p: float(p["price"].replace("$", "")) if p["price"] != "Not available" else float("inf"))
+
+    display_products(scraped_products)
+
+# Create the main GUI window
+root = tk.Tk()
+root.title("Product Price Comparison Tool")
+
+# Search entry and button
+search_frame = tk.Frame(root)
+search_label = tk.Label(search_frame, text="Search for a product:")
+search_label.pack(side=tk.LEFT)
+search_entry = tk.Entry(search_frame, width=50)
+search_entry.pack(side=tk.LEFT)
+search_button = tk.Button(search_frame, text="Search", command=search_products)
+search_button.pack(side=tk.RIGHT)
+search_frame.pack(padx=10, pady=10)
+
+# Product list box
+product_list = tk.Listbox(root, width=100)
+product_list.pack(padx=10, pady=10)
+
+# Disclaimer label (encourage responsible scraping)
+disclaimer_label = tk.Label(root, text="*Disclaimer:* Please scrape responsibly. Respect website robots.txt and terms of service.")
+disclaimer_label.pack(padx=10, pady=10)
+
+# Run the main event loop
+root.mainloop()
